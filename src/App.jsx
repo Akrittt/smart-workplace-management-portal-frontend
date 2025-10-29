@@ -16,6 +16,7 @@ import AdminDashboard from './components/admin/AdminDashboard';
 import UserManagement from './components/admin/UserManagement';
 import Analytics from './components/admin/Analytics';
 import SystemSettings from './components/admin/SystemSettings';
+import AIChatbot from './components/chatbot/AIChatbot';
 
 
 // Layout wrapper component
@@ -221,12 +222,11 @@ function App() {
               }
             />
 
-
-
             {/* Default Redirects */}
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
+           <AIChatbot/>
         </div>
       </BrowserRouter>
     </AuthProvider>
