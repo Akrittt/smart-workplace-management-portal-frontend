@@ -25,8 +25,8 @@ const ComplaintCard = ({ complaint, onAssign, onUpdate, showActions }) => {
   };
 
   return (
-    <div className="card hover:shadow-lg transition-shadow">
-      <div className="flex items-start justify-between mb-4">
+    <div className="card hover:shadow-lg transition-shadow relative flex flex-col h-full">
+      <div className="flex items-start justify-between mb-4 ">
         <div className="flex-1">
           <h3 className="text-lg font-semibold text-gray-900 mb-1">{complaint.title}</h3>
           <p className="text-sm text-gray-600">ID: #{complaint.id}</p>
@@ -76,7 +76,7 @@ const ComplaintCard = ({ complaint, onAssign, onUpdate, showActions }) => {
         )}
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 mt-auto">
         <p className="text-sm font-medium text-gray-700 mb-1">Description:</p>
         <p className="text-sm text-gray-600 line-clamp-3">{complaint.description}</p>
       </div>
@@ -89,7 +89,7 @@ const ComplaintCard = ({ complaint, onAssign, onUpdate, showActions }) => {
       )}
 
       {showActions && (
-        <div className="flex gap-3 pt-4 border-t">
+        <div className="flex gap-3 pt-4 border-t mt-auto">
           {complaint.status === 'OPEN' && (
             <button
               onClick={() => onAssign(complaint.id)}

@@ -17,11 +17,18 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchAdminStats();
+    fetchAdminStats(false);
+
+    const intervalId = setInterval(() => {
+      fetchAdminStats(true); 
+    }, 5000);
+
+    return () => clearInterval(intervalId);
   }, []);
 
-  const fetchAdminStats = async () => {
+  const fetchAdminStats = async (isBackground = false) => {
     try {
+      if (!isBackground) setLoading(true);
       const [usersRes, leavesRes, complaintsRes] = await Promise.all([
         api.get('/admin/users/count'),
         api.get('/admin/leaves/statistics'),
@@ -38,10 +45,10 @@ const AdminDashboard = () => {
         openComplaints: complaintsRes.data.open || 0,
       });
     } catch (error) {
-      toast.error('Failed to load admin statistics');
+      if (!isBackground) toast.error('Failed to load admin statistics');
       console.error(error);
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 

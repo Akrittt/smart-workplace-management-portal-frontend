@@ -5,6 +5,7 @@ import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import ComplaintCard from './ComplaintCard';
 import { useAuth } from '../../context/AuthContext';
+import { set } from 'date-fns';
 
 const ComplaintList = ({ showAll = false }) => {
   const [complaints, setComplaints] = useState([]);
@@ -14,42 +15,75 @@ const ComplaintList = ({ showAll = false }) => {
   const { user } = useAuth();
 
   useEffect(() => {
-    fetchComplaints();
+    fetchComplaints(true);
+    const intervalId = setInterval(() => {
+      fetchComplaints(false);
+    }, 5000);
+
+    return () => clearInterval(intervalId);
   }, [showAll]);
 
-  const fetchComplaints = async () => {
+  const fetchComplaints = async (isShowLoading = false) => {
     try {
+      if (isShowLoading) setLoading(true);
       const endpoint = showAll ? '/complaints/all' : '/complaints/my';
       const response = await api.get(endpoint);
       setComplaints(response.data);
     } catch (error) {
-      toast.error('Failed to load complaints');
+      if (isShowLoading) toast.error('Failed to load complaints');
     } finally {
-      setLoading(false);
+      if (isShowLoading) setLoading(false);
     }
   };
 
   const handleAssign = async (id) => {
+    const previousComplaints = [...complaints];
+
+    setComplaints(prevComplaints => prevComplaints.map(complaint => {
+      if (complaint.id === id) {
+        return {
+          ...complaint,
+          status: 'IN_PROGRESS',
+          assignedToId: user.userId,
+          assignedToName: user.name || user.fullName || 'Me'
+        };
+      }
+      return complaint;
+    }));
     try {
-      await api.put(`/complaints/${id}/assign/${user.userId}`);
+      await api.patch(`/complaints/${id}/assign/${user.userId}`);
       toast.success('Complaint assigned successfully!');
-      fetchComplaints();
     } catch (error) {
+      setComplaints(previousComplaints);
       toast.error(error.response?.data?.error || 'Failed to assign complaint');
     }
   };
 
   const handleUpdate = async (id, status) => {
+    const previousComplaints = [...complaints];
+
+    setComplaints(prevComplaints => prevComplaints.map(complaint => {
+      if (complaint.id === id) {
+        return {
+          ...complaint,
+          status: status,
+          resolvedAt: status === 'RESOLVED' ? new Date().toISOString() : complaint.resolvedAt
+        };
+      }
+      return complaint;
+    }));
+
+
     try {
-      await api.put(`/complaints/${id}`, { status });
+      await api.patch(`/complaints/${id}/status`, null, { params: { status: status } });
       toast.success('Complaint updated successfully!');
-      fetchComplaints();
     } catch (error) {
       toast.error(error.response?.data?.error || 'Failed to update complaint');
+      setComplaints(previousComplaints);
     }
   };
 
-  const filteredComplaints = complaints.filter(complaint => 
+  const filteredComplaints = complaints.filter(complaint =>
     filter === 'ALL' || complaint.status === filter
   );
 
@@ -70,7 +104,7 @@ const ComplaintList = ({ showAll = false }) => {
           </h1>
           <p className="text-gray-600 mt-1">{filteredComplaints.length} complaints found</p>
         </div>
-        
+
         {!showAll && (
           <button
             onClick={() => navigate('/complaints/new')}
@@ -91,11 +125,10 @@ const ComplaintList = ({ showAll = false }) => {
               <button
                 key={status}
                 onClick={() => setFilter(status)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  filter === status
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${filter === status
                     ? 'bg-primary-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                  }`}
               >
                 {status.replace('_', ' ')}
               </button>

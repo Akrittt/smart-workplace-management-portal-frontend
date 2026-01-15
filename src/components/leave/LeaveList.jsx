@@ -14,38 +14,71 @@ const LeaveList = ({ showAll = false }) => {
   const { user } = useAuth();
 
   useEffect(() => {
-    fetchLeaves();
+    fetchLeaves(true);
+
+    const interval = setInterval(() => {
+      fetchLeaves(false);
+    }, 3000); 
+
+    return () => clearInterval(interval);
   }, [showAll]);
 
-  const fetchLeaves = async () => {
+  const fetchLeaves = async (isShowLoading = false) => {
     try {
+      if(isShowLoading) setLoading(true);
       const endpoint = showAll ? '/leave/all' : '/leave/my-requests';
       const response = await api.get(endpoint);
       setLeaves(response.data);
     } catch (error) {
-      toast.error('Failed to load leaves');
+      if(isShowLoading) toast.error('Failed to load leaves');
     } finally {
-      setLoading(false);
+      if(isShowLoading) setLoading(false);
     }
   };
 
   const handleApprove = async (id) => {
+    const previousLeaves = [...leaves];
+
+    setLeaves(prev => prev.map(leave => {
+      if (leave.id === id) {
+        return { 
+          ...leave, 
+          status: 'APPROVED', 
+          managerName: user.fullName || user.firstName || 'Me' 
+        };
+      }
+      return leave;
+    }));
+
     try {
-      await api.put(`/leave/${id}/approve`);
+      await api.patch(`/leave/${id}/approve`);
       toast.success('Leave approved successfully!');
-      fetchLeaves();
     } catch (error) {
+      setLeaves(previousLeaves);
       toast.error(error.response?.data?.error || 'Failed to approve leave');
     }
   };
 
   const handleReject = async (id) => {
+    const previousLeaves = [...leaves];
+
+    setLeaves(prev => prev.map(leave => {
+      if (leave.id === id) {
+        return { 
+          ...leave, 
+          status: 'REJECTED', 
+          managerName: user.fullName || user.firstName || 'Me' 
+        };
+      }
+      return leave;
+    }));
+
     try {
-      await api.put(`/leave/${id}/reject`);
+      await api.patch(`/leave/${id}/reject`);
       toast.success('Leave rejected successfully!');
-      fetchLeaves();
     } catch (error) {
       toast.error(error.response?.data?.error || 'Failed to reject leave');
+      setLeaves(previousLeaves);
     }
   };
 
