@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
-import { Send, X, MessageCircle, Loader, Bot, User } from 'lucide-react';
+import { Send, X, MessageCircle, Loader, Bot, User, Trash2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const AIChatbot = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -16,28 +18,54 @@ const AIChatbot = () => {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, isOpen]); // Added isOpen to scroll when opening
 
   useEffect(() => {
     if (isOpen && messages.length === 0) {
-      // Load chat history
       loadChatHistory();
-      
-      // Show welcome message
-      setMessages([{
-        role: 'assistant',
-        content: "👋 Hi! I'm your AI workplace assistant. I can help you with:\n\n• Applying for leave\n• Filing complaints\n• Checking your leave balance\n• Answering policy questions\n\nHow can I help you today?",
-        timestamp: new Date()
-      }]);
     }
   }, [isOpen]);
 
   const loadChatHistory = async () => {
     try {
       const response = await api.get('/ai-assistant/history');
-      // Process history if needed
+
+      // Transform backend history to UI format
+      const historyMessages = [];
+      const sortedData = [...response.data].reverse();
+      sortedData.forEach(msg => {
+        // 1. Add User Message
+        historyMessages.push({
+          role: 'user',
+          content: msg.message,
+          timestamp: new Date(msg.createdAt)
+        });
+        // 2. Add AI Response
+        historyMessages.push({
+          role: 'assistant',
+          content: msg.response,
+          timestamp: new Date(msg.createdAt)
+        });
+      });
+
+      // If history is empty, add welcome message
+      if (historyMessages.length === 0) {
+        historyMessages.push({
+          role: 'assistant',
+          content: "👋 Hi! I'm your AI workplace assistant. I can help you with:\n\n* Applying for leave\n* Filing complaints\n* Checking your leave balance\n\n**Try asking:** \"Apply for sick leave tomorrow\"",
+          timestamp: new Date()
+        });
+      }
+
+      setMessages(historyMessages);
     } catch (error) {
-      console.error('Failed to load chat history');
+      console.error('Failed to load chat history', error);
+      // Fallback welcome message
+      setMessages([{
+        role: 'assistant',
+        content: "👋 Hi! I'm your AI workplace assistant. How can I help you today?",
+        timestamp: new Date()
+      }]);
     }
   };
 
@@ -62,6 +90,8 @@ const AIChatbot = () => {
         message: userMessage
       });
 
+      console.log('AI Response:', response.data);
+
       // Add AI response
       const aiMessage = {
         role: 'assistant',
@@ -71,10 +101,11 @@ const AIChatbot = () => {
       setMessages(prev => [...prev, aiMessage]);
 
     } catch (error) {
-      toast.error('Failed to get response. Please try again.');
+      console.error(error);
+      toast.error('Failed to get response.');
       const errorMessage = {
         role: 'assistant',
-        content: "Sorry, I'm having trouble connecting right now. Please try again in a moment.",
+        content: "⚠️ Sorry, I'm having trouble connecting right now. Please try again.",
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -90,11 +121,19 @@ const AIChatbot = () => {
     }
   };
 
+  const clearChat = () => {
+    setMessages([{
+      role: 'assistant',
+      content: "👋 Chat cleared. How can I help you now?",
+      timestamp: new Date()
+    }]);
+  };
+
   const quickActions = [
     "Check my leave balance",
-    "Apply for leave",
-    "File a complaint",
-    "Show company policies"
+    "Apply for sick leave tomorrow",
+    "File a complaint about AC",
+    "Check status of my complaints"
   ];
 
   return (
@@ -120,9 +159,16 @@ const AIChatbot = () => {
               </div>
               <div>
                 <h3 className="font-semibold">AI Assistant</h3>
-                <p className="text-xs text-white/80">Always here to help</p>
+                <p className="text-xs text-white/80">Powered by Llama 3</p>
               </div>
             </div>
+            <button
+              onClick={clearChat}
+              className="hover:bg-white/20 p-2 rounded-full transition-colors"
+              title="Clear Chat"
+            >
+              <Trash2 size={18} />
+            </button>
             <button
               onClick={() => setIsOpen(false)}
               className="hover:bg-white/20 p-2 rounded-full transition-colors"
@@ -139,39 +185,52 @@ const AIChatbot = () => {
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`flex gap-2 max-w-[85%] ${
-                    msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'
-                  }`}
+                  className={`flex gap-2 max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'
+                    }`}
                 >
                   {/* Avatar */}
                   <div
-                    className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                      msg.role === 'user'
+                    className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${msg.role === 'user'
                         ? 'bg-primary-600 text-white'
-                        : 'bg-gray-200 text-gray-700'
-                    }`}
+                        : 'bg-white border border-gray-200 text-primary-600'
+                      }`}
                   >
                     {msg.role === 'user' ? <User size={18} /> : <Bot size={18} />}
                   </div>
 
                   {/* Message bubble */}
                   <div
-                    className={`px-4 py-2 rounded-2xl ${
-                      msg.role === 'user'
+                    className={`px-4 py-2 rounded-2xl shadow-sm ${msg.role === 'user'
                         ? 'bg-primary-600 text-white'
-                        : 'bg-white text-gray-800 shadow-sm border border-gray-200'
-                    }`}
-                  >
-                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                    <p
-                      className={`text-xs mt-1 ${
-                        msg.role === 'user' ? 'text-white/70' : 'text-gray-500'
+                        : 'bg-white text-gray-800 border border-gray-200'
                       }`}
+                  >
+                    <div className={`text-sm prose prose-sm max-w-none ${msg.role === 'user' ? 'prose-invert text-white' : ''}`}>
+                      {msg.role === 'assistant' ? (
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            p: ({ node, ...props }) => <p className="mb-1 last:mb-0" {...props} />,
+                            ul: ({ node, ...props }) => <ul className="list-disc ml-4 mb-2" {...props} />,
+                            li: ({ node, ...props }) => <li className="mb-0.5" {...props} />,
+                            strong: ({ node, ...props }) => <span className="font-bold" {...props} />
+                          }}
+                        >
+                          {msg.content}
+                        </ReactMarkdown>
+                      ) : (
+                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                      )}
+                    </div>
+
+                    <p
+                      className={`text-[10px] mt-1 ${msg.role === 'user' ? 'text-white/70' : 'text-gray-400'
+                        }`}
                     >
-                      {new Date(msg.timestamp).toLocaleTimeString([], {
+                      {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], {
                         hour: '2-digit',
                         minute: '2-digit'
-                      })}
+                      }) : ''}
                     </p>
                   </div>
                 </div>
@@ -182,7 +241,7 @@ const AIChatbot = () => {
               <div className="flex justify-start">
                 <div className="flex gap-2 items-center bg-white px-4 py-3 rounded-2xl shadow-sm border border-gray-200">
                   <Loader className="animate-spin text-primary-600" size={18} />
-                  <span className="text-sm text-gray-600">AI is thinking...</span>
+                  <span className="text-xs text-gray-500 font-medium">Processing request...</span>
                 </div>
               </div>
             )}
@@ -190,10 +249,10 @@ const AIChatbot = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Quick Actions */}
-          {messages.length <= 1 && (
+          {/* Quick Actions (Only show if few messages) */}
+          {messages.length <= 2 && (
             <div className="p-3 border-t border-gray-200 bg-white">
-              <p className="text-xs text-gray-600 mb-2">Quick actions:</p>
+              <p className="text-xs text-gray-500 mb-2 font-medium ml-1">Try asking:</p>
               <div className="flex flex-wrap gap-2">
                 {quickActions.map((action, index) => (
                   <button
@@ -202,7 +261,7 @@ const AIChatbot = () => {
                       setInput(action);
                       sendMessage();
                     }}
-                    className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full transition-colors"
+                    className="px-3 py-1.5 text-xs bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 rounded-lg transition-all"
                   >
                     {action}
                   </button>
@@ -220,15 +279,15 @@ const AIChatbot = () => {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Type your message..."
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
                 disabled={loading}
               />
               <button
                 onClick={sendMessage}
                 disabled={!input.trim() || loading}
-                className="bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 text-white p-2 rounded-full transition-colors"
+                className="bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white p-2.5 rounded-full transition-all shadow-sm hover:shadow-md"
               >
-                <Send size={20} />
+                <Send size={18} />
               </button>
             </div>
           </div>
